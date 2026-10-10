@@ -29,10 +29,10 @@ go.work.sum
 .env
 
 # Editor/IDE
-# .idea/
+.idea/
 # .vscode/
 # Added by goreleaser init:
 dist/
 
 # Project binaries
-docexp
+/docexp
