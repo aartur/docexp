@@ -30,9 +30,9 @@ SELECT * FROM user LIMIT 3
 And now you would like to execute the code inside the blocks and include its output in the documentation file. Let's use the `docexp dry-run` command which parses the file and shows input for an *expansion script*:
 
 ```bash
-$ ./docexp dry-run tests/integration/testdata/doc_readme.md
-{"content":"from app import models\n\nusers = models.User.objects.all()\nprint(users[0])\n","id":1,"metadata":{"column":0,"filename":"tests/integration/testdata/doc_readme.md","headings":{"2":"Users"},"lang":"python","line":4}}
-{"content":"SELECT * FROM user LIMIT 3\n","id":2,"metadata":{"column":0,"filename":"tests/integration/testdata/doc_readme.md","headings":{"2":"Users","3":"Database access"},"lang":"sql","line":15}}
+$ ./docexp dry-run docs.md
+{"content":"from app import models\n\nusers = models.User.objects.all()\nprint(users[0])\n","id":1,"metadata":{"column":0,"filename":"docs.md","headings":{"2":"Users"},"lang":"python","line":4}}
+{"content":"SELECT * FROM user LIMIT 3\n","id":2,"metadata":{"column":0,"filename":"docs.md","headings":{"2":"Users","3":"Database access"},"lang":"sql","line":15}}
 ```
 
 The format is JSON lines. Each line describes a code block by including its content, file position and Markdown headings hierarchy. The expansion script `exp.py` consumes such input and expands each block by executing its content:
