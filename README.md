@@ -1,59 +1,45 @@
 # docexp - document expansion tool
 
-A minimal documentation tool that expands code blocks in Markdown documents.
+`docexp` is a minimal documentation tool that expands code blocks in Markdown documents. It can be thought of as a simple replacement of Jupyter code cells, which doesn't use custom file formats or complex execution environments.
 
 ## How it works
 
-Let's say you have a Markdown documentation file `docs.md` that includes two code blocks:
+Let's say you have a Markdown documentation file `docs.md` that includes a code block:
 
 ````markdown
-## Users
-
-To get the registered users, execute:
-
-```python
-from app import models
-
-users = models.User.objects.all()
-print(users[0])
-```
-
 ### Database access
 
-You can also inspect the database content directly:
+To inspect the database, run a sample query:
 
 ```sql
 SELECT * FROM user LIMIT 3
 ```
 ````
 
-And now you would like to execute the code inside the blocks and include its output in the documentation file. Let's use the `docexp dry-run` command which parses the file and shows input for an *expansion script*:
+Let's see how `docexp` parses the code block by using the `dry-run` command:
 
 ```bash
-$ ./docexp dry-run docs.md
-{"content":"from app import models\n\nusers = models.User.objects.all()\nprint(users[0])\n","id":1,"metadata":{"column":0,"filename":"docs.md","headings":{"2":"Users"},"lang":"python","line":4}}
-{"content":"SELECT * FROM user LIMIT 3\n","id":2,"metadata":{"column":0,"filename":"docs.md","headings":{"2":"Users","3":"Database access"},"lang":"sql","line":15}}
+$ docexp dry-run docs.md
+{"content":"SELECT * FROM user LIMIT 3\n","id":1,"metadata":{"column":0,"filename":"docs.md","headings":{"3":"Database access"},"lang":"sql","line":7}}
 ```
 
-The format is JSON lines. Each line describes a code block by including its content, file position and Markdown headings hierarchy. The expansion script `exp.py` consumes such input and expands each block by executing its content:
+We can see the block was parsed as a JSON object, and we can access the SQL query, as well as check its file position and the Markdown headings hierarchy.
+
+To run the query and produce some output, we need to create an *expander script*. The script will receive the code blocks shown by the `dry-run` command (as JSON-lines), and it should produce JSON objects `{"id": <id of the source block>, "exp": <expansion>}`.
+
+A sample Python script `exp.py` looks like follows:
 
 ```python
 #!/usr/bin/env python
 
-import sys, json, subprocess, io, contextlib
+import sys, json, subprocess
 
 for line in sys.stdin:
     block = json.loads(line)
     match block.get("lang"):
-        case "python":
-            buffer = io.StringIO()
-            with contextlib.redirect_stdout(buffer):
-                exec(code_fragment)
-            out = {"id": block["id"], "exp": buffer.getvalue()}
-            print(json.dumps(out))
         case "sql":
             res = subprocess.run(
-                ["psql", "-d", "db01", "-c", block["content"]],
+                ["psql", "-d", "db_dev01", "-c", block["content"]],
                 capture_output=True,
                 text=True,
                 check=True,
@@ -65,30 +51,13 @@ for line in sys.stdin:
 To run the expansion, execute:
 
 ```bash
-docexp run --expander exp.py docs.md
+$ docexp run --expander exp.py docs.md
 ```
 
 `docs.md` now includes the expansion fragments:
 
 ````markdown
-## Users
-
-To get the registered users, execute:
-
-```python
-from app import models
-
-users = models.User.objects.all()
-print(users[0])
-```
-
-<!-- <docexp> -->
-```
-<User id=123 name=adam email=adam@example.com>
-```
-<!-- </docexp> -->
-
-### Database access
+## Database access
 
 You can also inspect the database content directly:
 
@@ -109,9 +78,17 @@ SELECT * FROM user LIMIT 3
 
 ````
 
+The expansion is marked using `<docexp>` tags within HTML comments, which ensures the regeneration of expansions will work correctly.
+
 ## Writing expander scripts
 
-The expander script can be a complex piece of code. Usually it needs to preserve state during execution, so you might need to do things like running Docker containers in background and passing code blocks to execute. You must also handle security and detecting errors.
+The tool moves much complexity to the expander script. You need to manage the various ways a code block can be executed:
+- using a Docker container launched for the single command
+- using a background Docker container to preserve the state and pass commands to it (that mimics Jupyter kernels)
+- using different containers, depending on the `language` of a code block or a Markdown title hierarchy
+- making security checks and using sandboxed environemnts (e.g. using a read-only database connection)
+
+The future versions of the tool might include helpers for writing the expander scripts.
 
 ## Installation
 
@@ -119,9 +96,9 @@ Install the tool from the source code or from the releases page.
 
 ## Why someone would use `docexp`?
 
-Full content/documentation tools like Jupyter Notebooks or Sphinx bring their own complexity due to their size. They use custom file formats and use heavy execution components (like Jupyter kernels).
+Full content/documentation tools like Jupyter Notebooks or Sphinx bring their own problems due to their size and complexity. They use custom file formats and heavy execution components (like Jupyter kernels).
 
-`docexp` stays raw and simple. Both inputs and outputs are plain Markdown documents. The expander script concept makes code execution very explicit and traceable. The tool never modifies existing content, it can only add new content.
+`docexp` stays raw and simple. It's plain Markdown with one-line comment tags. The expander script concept makes code execution very explicit and traceable. The tool never modifies existing content, it only adds new content.
 
 If all you need is code blocks expansion, `docexp` might work well for you.
 
@@ -129,5 +106,8 @@ If all you need is code blocks expansion, `docexp` might work well for you.
 
 The code doesn't include any AI-generated content. It's a Golang learning project.
 
-The implementation is fairly abstract with a domain model in `document.go`, which doesn't
-hard-code Markdown as the only supported format. It handles expandable spans being any file ranges.
+The v0.1.* of the tool is a BETA release.
+
+The implementation is fairly abstract with a domain model in `document.go`, 
+which doesn't hard-code Markdown as the only supported format. It handles 
+expandable spans being any file ranges, so it's possible to implement macro-like expansions of inline spans.
