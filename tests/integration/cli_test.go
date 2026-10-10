@@ -15,7 +15,7 @@ func buildBinary(t *testing.T) string {
 	t.Helper()
 
 	binPath := filepath.Join(t.TempDir(), "docexp")
-	cmd := exec.Command("go", "build", "-o", binPath, "../../main.go")
+	cmd := exec.Command("go", "build", "-o", binPath, "../../cmd/docexp")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("failed to build docexp binary: %v\n%s", err, string(out))
 	}
